@@ -85,7 +85,7 @@ TUNE_END:
 
 	/* turn on ddr power */
 	ldr	r7, =(0x1 << 29)
-	str	r7, [r1, #0x388]
+	str	r7, [r1, #0x380]
 
 	ldr	r6, =50
 1:
@@ -151,7 +151,7 @@ TUNE_END:
 	str	r7, [r3, r6]
 
 	ldr	r6, =0x108
-	ldr	r7, =0x03060708
+	ldr	r7, =0x03060707
 	str	r7, [r3, r6]
 
 	ldr	r6, =0x10c
@@ -171,10 +171,6 @@ TUNE_END:
 	str	r7, [r3, r6]
 
 	ldr	r6, =0x11c
-	ldr	r7, =0x00000202
-	str	r7, [r3, r6]
-
-	ldr	r6, =0x120
 	ldr	r7, =0x00000202
 	str	r7, [r3, r6]
 
@@ -200,10 +196,6 @@ TUNE_END:
 
 	ldr	r6, =0x204
 	ldr	r7, =0x00171717
-	str	r7, [r3, r6]
-
-	ldr	r6, =0x210
-	ldr	r7, =0xF00
 	str	r7, [r3, r6]
 
 	ldr	r6, =0x214
@@ -235,10 +227,10 @@ TUNE_END:
 
 	ldr	r7, [r1, #0x800]
 	and	r7, r7, #0xFF
-	cmp	r7, #0x11
-	bne	2f
+	cmp	r7, #0x10
+	beq	2f
 
-	/* for TO1.1 */
+	/* TO1.1 */
 	ldr	r7, [r11]
 	bic	r7, r7, #(1 << 27)
 	str	r7, [r11]
@@ -246,11 +238,8 @@ TUNE_END:
 	bic	r7, r7, #(1 << 29)
 	str	r7, [r11]
 2:
-	/* clear/set bit30 of SNVS_MISC_CTRL to ensure exit from ddr retention */
 	ldr	r7, =(0x1 << 30)
-	str	r7, [r1, #0x388]
-	ldr	r7, =(0x1 << 30)
-	str	r7, [r1, #0x384]
+	str	r7, [r1, #0x380]
 
 	/* need to delay ~5mS */
 	ldr	r6, =0x100000
@@ -275,14 +264,10 @@ TUNE_END:
 	ldr	r7, =0x0007080C
 	str	r7, [r4, r6]
 
-	ldr	r6, =0xb0
-	ldr	r7, =0x1010007e
-	str	r7, [r4, r6]
-
 	ldr     r7, [r1, #0x800]
 	and     r7, r7, #0xFF
-	cmp     r7, #0x11
-	bne     4f
+	cmp     r7, #0x10
+	beq     4f
 
 	ldr	r6, =0x7c
 	ldr	r7, =0x1c1c1c1c
@@ -416,12 +401,6 @@ TUNE_END:
 	ldr r0, =IOMUXC_GPR_BASE_ADDR
 	ldr r1, =0x4f400005
 	str r1, [r0, #0x4]
-
-	/* clear/set bit30 of SNVS_MISC_CTRL to ensure exit from ddr retention */
-	ldr r0, =ANATOP_BASE_ADDR
-	ldr r1, =(0x1 << 30)
-	str r1, [r0, #0x388]
-	str r1, [r0, #0x384]
 
 	ldr r0, =SRC_BASE_ADDR
 	ldr r1, =0x2

@@ -7,7 +7,7 @@
  * Based on code from LTIB:
  * Freescale GPMI NFC NAND Flash Driver
  *
- * Copyright (C) 2010-2016 Freescale Semiconductor, Inc.
+ * Copyright (C) 2010-2015 Freescale Semiconductor, Inc.
  * Copyright (C) 2008 Embedded Alley Solutions, Inc.
  *
  * SPDX-License-Identifier:	GPL-2.0+
@@ -248,12 +248,6 @@ static int mxs_nand_get_ecc_strength(struct mtd_info *mtd)
 	} else {
 		ecc_strength = chip->ecc_strength_ds;
 		ecc_strength += ecc_strength & 1;
-#if defined(CONFIG_NAND_MXS_BCH_LEGACY_GEO)
-		ecc_strength = ((page_oob_size - MXS_NAND_METADATA_SIZE) * 8)
-			/(galois_field * mxs_nand_ecc_chunk_cnt(mtd->writesize));
-		ecc_strength += ecc_strength & 1;
-		ecc_strength = min(ecc_strength, MXS_NAND_MAX_ECC_STRENGTH);
-#endif
 	}
 	return 0;
 };
@@ -639,45 +633,6 @@ static uint8_t mxs_nand_read_byte(struct mtd_info *mtd)
 	return buf;
 }
 
-static bool mxs_nand_erased_page(struct mtd_info *mtd, struct nand_chip *nand,
-				 uint8_t *buf, int chunk, int page)
-{
-	int gf_len = galois_field;
-	unsigned int flip_bits = 0, flip_bits_noecc = 0;
-	unsigned int threshold;
-	unsigned int ecc_chunkn_size = MXS_NAND_CHUNK_DATA_CHUNK_SIZE;
-	unsigned int base = ecc_chunkn_size * chunk;
-	uint32_t *dma_buf = (uint32_t *)buf;
-	int i;
-
-	threshold = gf_len / 2;
-	if (threshold > ecc_strength)
-		threshold = ecc_strength;
-
-	for (i = 0; i < ecc_chunkn_size; i++) {
-		flip_bits += hweight8(~buf[base + i]);
-		if (flip_bits > threshold)
-			return false;
-	}
-
-	nand->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
-	nand->read_buf(mtd, buf, mtd->writesize);
-
-	for (i = 0; i < mtd->writesize / 4; i++) {
-		flip_bits_noecc += hweight32(~dma_buf[i]);
-		if (flip_bits_noecc > threshold)
-			return false;
-	}
-
-	mtd->ecc_stats.corrected += flip_bits;
-
-	memset(buf, 0xff, mtd->writesize);
-
-	printf("The page(%d) is an erased page(%d,%d,%d,%d).\n", page, chunk, threshold, flip_bits, flip_bits_noecc);
-
-	return true;
-}
-
 /*
  * Read a page from NAND.
  */
@@ -687,14 +642,10 @@ static int mxs_nand_ecc_read_page(struct mtd_info *mtd, struct nand_chip *nand,
 {
 	struct mxs_nand_info *nand_info = nand->priv;
 	struct mxs_dma_desc *d;
-#if defined(CONFIG_MX6QP) || defined(CONFIG_MX7) || defined(CONFIG_MX6UL)
-	struct mxs_bch_regs *bch_regs = (struct mxs_bch_regs *)MXS_BCH_BASE;
-#endif
 	uint32_t channel = MXS_DMA_CHANNEL_AHB_APBH_GPMI0 + nand_info->cur_chip;
 	uint32_t corrected = 0, failed = 0;
 	uint8_t	*status;
 	int i, ret;
-	int flag = 0;
 
 	/* Compile the DMA descriptor - wait for ready. */
 	d = mxs_nand_get_dma_desc(nand_info);
@@ -784,8 +735,6 @@ static int mxs_nand_ecc_read_page(struct mtd_info *mtd, struct nand_chip *nand,
 		goto rtn;
 	}
 
-	mxs_nand_return_dma_descs(nand_info);
-
 	/* Invalidate caches */
 	mxs_nand_inval_data_buf(nand_info);
 
@@ -798,18 +747,10 @@ static int mxs_nand_ecc_read_page(struct mtd_info *mtd, struct nand_chip *nand,
 		if (status[i] == 0x00)
 			continue;
 
-		if (status[i] == 0xff) {
-#if defined(CONFIG_MX6QP) || defined(CONFIG_MX7) || defined(CONFIG_MX6UL)
-			if (readl(&bch_regs->hw_bch_debug1))
-				flag = 1;
-#endif
+		if (status[i] == 0xff)
 			continue;
-		}
 
 		if (status[i] == 0xfe) {
-			if (mxs_nand_erased_page(mtd, nand,
-						 nand_info->data_buf, i, page))
-				break;
 			failed++;
 			continue;
 		}
@@ -835,9 +776,6 @@ static int mxs_nand_ecc_read_page(struct mtd_info *mtd, struct nand_chip *nand,
 	nand->oob_poi[0] = nand_info->oob_buf[0];
 
 	memcpy(buf, nand_info->data_buf, mtd->writesize);
-
-	if (flag)
-		memset(buf, 0xff, mtd->writesize);
 
 rtn:
 	mxs_nand_return_dma_descs(nand_info);
@@ -1161,12 +1099,6 @@ static int mxs_nand_scan_bbt(struct mtd_info *mtd)
 	tmp |= (14 == galois_field ? 1 : 0)
 		<< BCH_FLASHLAYOUT1_GF13_0_GF14_1_OFFSET;
 	writel(tmp, &bch_regs->hw_bch_flash0layout1);
-
-	/* Set erase threshold to ecc strength for mx6ul, mx6qp and mx7 */
-#if defined(CONFIG_MX6QP) || defined(CONFIG_MX7) || defined(CONFIG_MX6UL)
-		writel(BCH_MODE_ERASE_THRESHOLD(ecc_strength),
-		       &bch_regs->hw_bch_mode);
-#endif
 
 	/* Set *all* chip selects to use layout 0 */
 	writel(0, &bch_regs->hw_bch_layoutselect);

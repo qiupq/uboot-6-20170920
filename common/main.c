@@ -82,6 +82,11 @@ void main_loop(void)
 	update_tftp(0UL);
 #endif /* CONFIG_UPDATE_TFTP */
 
+#ifdef	CONFIG_DISPLAY_LOGO
+	run_command("fatload mmc 2:1 0x15000000 logo.bmp",0);
+	run_command("bmp display 0x15000000",0);
+#endif
+
 	s = bootdelay_process();
 	if (cli_process_fdt(&s))
 		cli_secure_boot_cmd(s);

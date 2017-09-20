@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2015 Freescale Semiconductor, Inc.
+ * Copyright (C) 2012-2016 Freescale Semiconductor, Inc.
  *
  * Configuration settings for the Freescale i.MX6Q SabreSD board.
  *
@@ -15,6 +15,8 @@
 #define CONFIG_MX6DL
 #endif
 
+#define	CONFIG_LIB_UUID
+#define	CONFIG_LIB_RAND
 /* uncomment for PLUGIN mode support */
 /* #define CONFIG_USE_PLUGIN */
 
@@ -70,7 +72,11 @@
 #define CONFIG_CMD_EXT4
 #define CONFIG_CMD_EXT4_WRITE
 #define CONFIG_CMD_FAT
+#define	CONFIG_FAT_WRITE
+#define	CONFIG_FAT_CP
+
 #define CONFIG_DOS_PARTITION
+#define CONFIG_GET_DDR_TARGET_DELAY
 
 #define CONFIG_SUPPORT_EMMC_BOOT /* eMMC specific */
 
@@ -83,10 +89,23 @@
 #define IMX_FEC_BASE			ENET_BASE_ADDR
 #define CONFIG_FEC_XCV_TYPE		RGMII
 #define CONFIG_ETHPRIME			"FEC"
+#ifdef CONFIG_EMBEDSKY_AR8035
+#define CONFIG_FEC_MXC_PHYADDR			0
+#else
 #define CONFIG_FEC_MXC_PHYADDR		1
+#endif
+#if defined(CONFIG_EMBEDSKY_E9) 
+#define	CONFIG_IPADDR					192.168.1.119
+#define	CONFIG_NETMASK					255.255.255.0
+#define	CONFIG_ETHADDR					00:00:00:00:00:00
+#define	CONFIG_SERVERIP					192.168.1.84
+#define	CONFIG_GATEWAYIP				192.168.1.1
+#endif /* CONFIG_EMBEDSKY_E9 */
 
-#define CONFIG_PHYLIB
+
+
 #define CONFIG_PHY_ATHEROS
+#define CONFIG_PHYLIB
 
 /* allow to overwrite serial and ethaddr */
 #define CONFIG_ENV_OVERWRITE
@@ -96,10 +115,17 @@
 /* Command definition */
 #include <config_cmd_default.h>
 
+#define	CONFIG_CMD_BMP
+#define	CONFIG_CMD_MENU
+#define	CONFIG_CMD_BOOTMENU
+#define	CONFIG_MENU
+#define	CONFIG_MENUKEY	' '
+
 #define CONFIG_CMD_BMODE
 #define CONFIG_CMD_BOOTZ
 #define CONFIG_CMD_SETEXPR
 #undef CONFIG_CMD_IMLS
+#define	CONFIG_CMD_BOOTI
 
 #define CONFIG_BOOTDELAY               1
 
@@ -107,6 +133,15 @@
 #define CONFIG_SYS_TEXT_BASE           0x17800000
 #define CONFIG_SYS_MMC_IMG_LOAD_PART	1
 
+#define CONFIG_BOOTLINUX \
+	"run loadimage;" \
+	"run loadfdt;" \
+	"run mmcargs;" \
+	"bootz ${loadaddr} - ${fdt_addr}"
+#define CONFIG_BOOTANDROID \
+	"run mmcargs;"	\
+	"run loadimage;"	\
+	"boota ${loadaddr}"
 #ifdef CONFIG_SYS_BOOT_NAND
 #define CONFIG_MFG_NAND_PARTITION "mtdparts=gpmi-nand:64m(boot),16m(kernel),16m(dtb),-(rootfs) "
 #else
@@ -188,7 +223,11 @@
 	"epdc_waveform=epdc_splash.bin\0" \
 	"script=boot.scr\0" \
 	"image=zImage\0" \
+	"tftpimage=zImage\0" \
+	"splashimage=0x15000000\0"	\
 	"fdt_file=" CONFIG_DEFAULT_FDT_FILE "\0" \
+	"boot_linux="CONFIG_BOOTLINUX "\0"	\
+	"boot_android="CONFIG_BOOTANDROID "\0"	\
 	"fdt_addr=0x18000000\0" \
 	"boot_fdt=try\0" \
 	"ip_dyn=yes\0" \
@@ -199,6 +238,16 @@
 	"mmcpart=" __stringify(CONFIG_SYS_MMC_IMG_LOAD_PART) "\0" \
 	"mmcroot=" CONFIG_MMCROOT " rootwait rw\0" \
 	"mmcautodetect=yes\0" \
+	"panel=CLAA-WVGA\0"	\
+	"splashpos=m,m\0"	\
+	"menucmd=menu\0"	\
+	"nfsserverip="__stringify(CONFIG_SERVERIP)"\0"	\
+	"mxcfb0=video=mxcfb0:dev=lcd,CLAA-WVGA\0"	\
+	"mxcfb1=video=mxcfb1:off\0"	\
+	"mxcfb2=video=mxcfb2:off\0"	\
+	"mxcfb3=video=mxcfb3:off\0"	\
+	"dh=dhcp\0"	\
+	"nfsroot=/work/nfsboot/android\0"	\
 	"update_sd_firmware=" \
 		"if test ${ip_dyn} = yes; then " \
 			"setenv get_cmd dhcp; " \
@@ -214,28 +263,24 @@
 		"fi\0" \
 	EMMC_ENV	  \
 	"smp=" CONFIG_SYS_NOSMP "\0"\
-	"mmcargs=setenv bootargs console=${console},${baudrate} ${smp} " \
-		"root=${mmcroot}\0" \
 	"loadbootscript=" \
 		"fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${script};\0" \
 	"bootscript=echo Running bootscript from mmc ...; " \
 		"source\0" \
 	"loadimage=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${image}\0" \
 	"loadfdt=fatload mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${fdt_file}\0" \
+	"mmcargs=setenv bootargs console=${console},${baudrate} init=/init ${smp} " \
+		"root=${mmcroot} ${mxcfb0} ${mxcfb1} ${mxcfb2} ${mxcfb3} vmalloc=256M androidboot.console=ttymxc0 consoleblank=0 androidboot.hardware=freescale cma=384M\0" \
 	"mmcboot=echo Booting from mmc ...; " \
 		"run mmcargs; " \
-		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
+		"if run loadimage; then " \
 			"if run loadfdt; then " \
-				"bootz ${loadaddr} - ${fdt_addr}; " \
+				"booti ${loadaddr} - ${fdt_addr}; " \
 			"else " \
-				"if test ${boot_fdt} = try; then " \
-					"bootz; " \
-				"else " \
-					"echo WARN: Cannot load the DT; " \
-				"fi; " \
+				"echo ERROR: Cannot load the DT;"	\
 			"fi; " \
 		"else " \
-			"bootz; " \
+			"echo ERROR: Cannot load the kernel; " \
 		"fi;\0" \
 	"netargs=setenv bootargs console=${console},${baudrate} ${smp} " \
 		"root=/dev/nfs " \
@@ -261,7 +306,7 @@
 		"else " \
 			"bootz; " \
 		"fi;\0"
-
+/*
 #define CONFIG_BOOTCOMMAND \
 	"mmc dev ${mmcdev};" \
 	"if mmc rescan; then " \
@@ -273,7 +318,9 @@
 			"else run netboot; " \
 			"fi; " \
 		"fi; " \
-	"else run netboot; fi"
+	"else run netboot; fi"*/
+#define CONFIG_BOOTCOMMAND \
+	"run boot_linux"
 #endif
 
 #define CONFIG_ARP_TIMEOUT     200UL
@@ -301,7 +348,7 @@
 #define CONFIG_STACKSIZE               (128 * 1024)
 
 /* Physical Memory Map */
-#define CONFIG_NR_DRAM_BANKS           1
+#define CONFIG_NR_DRAM_BANKS				2
 #define PHYS_SDRAM                     MMDC0_ARB_BASE_ADDR
 
 #define CONFIG_SYS_SDRAM_BASE          PHYS_SDRAM
@@ -402,7 +449,7 @@
 #define CONFIG_ENV_OFFSET              (4 * CONFIG_SYS_FLASH_SECT_SIZE)
 #elif defined(CONFIG_ENV_IS_IN_NAND)
 #undef CONFIG_ENV_SIZE
-#define CONFIG_ENV_OFFSET              (37 << 20)
+#define CONFIG_ENV_OFFSET              (60 << 20)
 #define CONFIG_ENV_SECT_SIZE           (128 << 10)
 #define CONFIG_ENV_SIZE                        CONFIG_ENV_SECT_SIZE
 #elif defined(CONFIG_ENV_IS_IN_SATA)
@@ -433,9 +480,10 @@
 #define CONFIG_VIDEO_BMP_RLE8
 #define CONFIG_SPLASH_SCREEN
 #define CONFIG_SPLASH_SCREEN_ALIGN
-#define CONFIG_BMP_16BPP
+#define	CONFIG_DISPLAY_LOGO
+/*#define CONFIG_BMP_16BPP
 #define CONFIG_VIDEO_LOGO
-#define CONFIG_VIDEO_BMP_LOGO
+#define CONFIG_VIDEO_BMP_LOGO*/
 #ifdef CONFIG_MX6DL                                                             
 #define CONFIG_IPUV3_CLK 198000000
 #else
@@ -444,6 +492,30 @@
 #define CONFIG_IMX_HDMI
 #define CONFIG_IMX_VIDEO_SKIP
 
+#define CONFIG_CI_UDC
+#define CONFIG_USBD_HS
+#define CONFIG_USB_GADGET_DUALSPEED
+
+#define CONFIG_USB_GADGET
+#define CONFIG_CMD_USB_MASS_STORAGE
+#define CONFIG_USB_GADGET_MASS_STORAGE
+#define CONFIG_USBDOWNLOAD_GADGET
+#define CONFIG_USB_GADGET_VBUS_DRAW                             2
+
+#define CONFIG_G_DNL_VENDOR_NUM                                 0x18d1
+#define CONFIG_G_DNL_PRODUCT_NUM                                0x0d02
+#define CONFIG_G_DNL_MANUFACTURER                               "FSL"
+
+#define CONFIG_CMD_FASTBOOT
+#define CONFIG_ANDROID_BOOT_IMAGE
+#define CONFIG_FASTBOOT_FLASH
+
+#define CONFIG_CMD_BOOTA
+#define CONFIG_SUPPORT_RAW_INITRD
+#define CONFIG_SERIAL_TAG
+
+#define CONFIG_USB_FASTBOOT_BUF_ADDR   CONFIG_SYS_LOAD_ADDR
+#define CONFIG_USB_FASTBOOT_BUF_SIZE   0x19000000
 #if defined(CONFIG_ANDROID_SUPPORT)
 #include "mx6sabreandroid_common.h"
 #endif

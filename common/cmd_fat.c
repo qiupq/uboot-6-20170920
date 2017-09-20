@@ -149,3 +149,85 @@ U_BOOT_CMD(
 	"      to 'dev' on 'interface'"
 );
 #endif
+
+#ifdef CONFIG_FAT_CP
+static int do_fat_fscp(cmd_tbl_t *cmdtp, int flag,
+		int argc, char * const argv[])
+{
+	loff_t size;
+	int ret;
+	unsigned long addr;
+	unsigned long count;
+	block_dev_desc_t *dev_desc = NULL;
+	disk_partition_t info;
+	int dev = 0;
+	int part = 1;
+	void *buf;
+	int argc_t = 0;
+	char* argv_t[10];
+	int i = 0;
+
+	if (argc < 5)
+		return cmd_usage(cmdtp);
+
+	part = get_device_and_partition(argv[1], argv[2], &dev_desc, &info, 1);
+	if (part < 0)
+		return 1;
+
+	dev = dev_desc->dev;
+
+	if (fat_set_blk_dev(dev_desc, &info) != 0) {
+		printf("\n** Unable to use %s %d:%d for fatwrite **\n",
+			argv[1], dev, part);
+		return 1;
+	}
+
+	argc_t = 5;
+	for(i = 0; i < 3; i++) {
+		argv_t[i] = argv[i];
+	}
+	argv_t[3] = "0x12000000";
+	argv_t[4] = argv[3];
+	ret = do_load(cmdtp, flag, argc_t, argv_t, FS_TYPE_FAT);
+	if(ret < 0) {
+		return ret;
+	}
+	argc_t = 4;
+	ret = do_size(cmdtp, flag, argc_t, argv, FS_TYPE_FAT);
+	if(ret < 0) {
+		return ret;
+	}
+	count = getenv_hex("filesize", 0);
+	addr = simple_strtoul("0x12000000", NULL, 16);
+	part = get_device_and_partition(argv[4], argv[5], &dev_desc, &info, 1);
+	if (part < 0)
+		return 1;
+
+	dev = dev_desc->dev;
+	if (fat_set_blk_dev(dev_desc, &info) != 0) {
+		printf("\n** Unable to use %s %d:%d for fatwrite **\n",
+			argv[4], dev, part);
+		return 1;
+	}
+	buf = map_sysmem(addr, count);
+	ret = file_fat_write(argv[6], buf, 0, count, &size);
+	unmap_sysmem(buf);
+	if (ret < 0) {
+		printf("\n** Unable to write \"%s\" from %s %d:%d **\n",
+			argv[6], argv[4], dev, part);
+		return 1;
+	}
+
+	printf("%llu bytes written\n", size);
+
+	return 0;
+}
+
+U_BOOT_CMD(
+	fatcp,	7,	0,	do_fat_fscp,
+	"cp file into a dos filesystem",
+	"<interface> <dev[:part]> <filename> <interface> <dev[:part]> <filename>\n"
+	"    - write file 'filename' from the address 'addr' in RAM\n"
+	"      to 'dev' on 'interface'"
+);
+#endif

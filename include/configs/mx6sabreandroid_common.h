@@ -51,13 +51,11 @@
 #define CONFIG_SUPPORT_RAW_INITRD
 #define CONFIG_SERIAL_TAG
 
-#undef CONFIG_EXTRA_ENV_SETTINGS
+/*#undef CONFIG_EXTRA_ENV_SETTINGS*/
 #undef CONFIG_BOOTCOMMAND
+#define CONFIG_BOOTCOMMAND \
+	"run boot_linux"
 
-#define CONFIG_EXTRA_ENV_SETTINGS					\
-	"splashpos=m,m\0"	  \
-	"fdt_high=0xffffffff\0"	  \
-	"initrd_high=0xffffffff\0" \
 
 #define CONFIG_USB_FASTBOOT_BUF_ADDR   CONFIG_SYS_LOAD_ADDR
 #define CONFIG_USB_FASTBOOT_BUF_SIZE   0x19000000

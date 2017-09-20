@@ -482,6 +482,21 @@ int cli_readline(const char *const prompt)
 	return cli_readline_into_buffer(prompt, console_buffer, 0);
 }
 
+int TQ_readline(char *prompt)
+{
+	/*
+	 * If console_buffer isn't 0-length the user will be prompted to modify
+	 * it instead of entering it from scratch as desired.
+	 */
+	console_buffer[0] = '\0';
+	if(prompt) {
+		strcpy(console_buffer,prompt);
+	}
+	prompt = NULL;
+
+	return cli_readline_into_buffer(prompt, console_buffer, 0);
+}
+
 
 int cli_readline_into_buffer(const char *const prompt, char *buffer,
 			     int timeout)

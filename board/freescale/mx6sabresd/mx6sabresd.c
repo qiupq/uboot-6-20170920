@@ -62,6 +62,9 @@ DECLARE_GLOBAL_DATA_PTR;
 	PAD_CTL_SPEED_LOW | PAD_CTL_DSE_80ohm |			\
 	PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
 
+#define USDHC_PAD_GPIO_CTRL (PAD_CTL_PUS_22K_UP |		\
+	PAD_CTL_SPEED_LOW | PAD_CTL_DSE_40ohm |			\
+	PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
 #define ENET_PAD_CTRL  (PAD_CTL_PUS_100K_UP |			\
 	PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm | PAD_CTL_HYS)
 
@@ -95,9 +98,33 @@ int dram_init(void)
 }
 
 static iomux_v3_cfg_t const uart1_pads[] = {
-	MX6_PAD_CSI0_DAT10__UART1_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
-	MX6_PAD_CSI0_DAT11__UART1_RX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
+#ifdef CONFIG_EMBEDSKY_E9
+	MX6_PAD_SD3_DAT6__UART1_RX_DATA		| MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_SD3_DAT7__UART1_TX_DATA		| MUX_PAD_CTRL(UART_PAD_CTRL),
+#else
+	MX6_PAD_CSI0_DAT10__UART1_TX_DATA	| MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_CSI0_DAT11__UART1_RX_DATA	| MUX_PAD_CTRL(UART_PAD_CTRL),
+#endif /* CONFIG_EMBEDSKY_E9 */
 };
+
+#ifdef CONFIG_EMBEDSKY_E9
+static iomux_v3_cfg_t const uart2_pads[] = {
+	MX6_PAD_EIM_D26__UART2_TX_DATA		| MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_EIM_D27__UART2_RX_DATA		| MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_EIM_D28__UART2_DTE_CTS_B	| MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_EIM_D29__UART2_RTS_B		| MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
+static iomux_v3_cfg_t const uart3_pads[] = {
+	MX6_PAD_EIM_D24__UART3_TX_DATA		| MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_EIM_D25__UART3_RX_DATA		| MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
+static iomux_v3_cfg_t const uart4_pads[] = {
+	MX6_PAD_KEY_COL0__UART4_TX_DATA		| MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_KEY_ROW0__UART4_RX_DATA		| MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+#endif /* CONFIG_EMBEDSKY_E9 */
 
 static iomux_v3_cfg_t const enet_pads[] = {
 	MX6_PAD_ENET_MDIO__ENET_MDIO		| MUX_PAD_CTRL(ENET_PAD_CTRL),
@@ -117,16 +144,39 @@ static iomux_v3_cfg_t const enet_pads[] = {
 	MX6_PAD_RGMII_RX_CTL__RGMII_RX_CTL	| MUX_PAD_CTRL(ENET_PAD_CTRL),
 	/* AR8031 PHY Reset */
 	MX6_PAD_ENET_CRS_DV__GPIO1_IO25		| MUX_PAD_CTRL(NO_PAD_CTRL),
+#ifdef CONFIG_EMBEDSKY_AR8035
+
+	MX6_PAD_GPIO_0__CCM_CLKO1			| MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_GPIO_3__CCM_CLKO2			| MUX_PAD_CTRL(NO_PAD_CTRL),
+#endif /* CONFIG_EMBEDSKY_E9 */
 };
 
 static void setup_iomux_enet(void)
 {
 	imx_iomux_v3_setup_multiple_pads(enet_pads, ARRAY_SIZE(enet_pads));
+#ifdef CONFIG_EMBEDSKY_AR8035
 
+	unsigned int reg;
+	/* phy reset: gpio1-25 */
+	reg = readl(GPIO1_BASE_ADDR + 0x0);
+	reg &= ~0x2000000;
+	writel(reg, GPIO1_BASE_ADDR + 0x0);
+
+	reg = readl(GPIO1_BASE_ADDR + 0x4);
+	reg |= 0x2000000;
+	writel(reg, GPIO1_BASE_ADDR + 0x4);
+
+	udelay(500);
+
+	reg = readl(GPIO1_BASE_ADDR + 0x0);
+	reg |= 0x2000000;
+	writel(reg, GPIO1_BASE_ADDR + 0x0);
+#else
 	/* Reset AR8031 PHY */
 	gpio_direction_output(IMX_GPIO_NR(1, 25) , 0);
 	udelay(500);
 	gpio_set_value(IMX_GPIO_NR(1, 25), 1);
+#endif /* CONFIG_EMBEDSKY_E9 */
 }
 
 static iomux_v3_cfg_t const usdhc2_pads[] = {
@@ -136,11 +186,15 @@ static iomux_v3_cfg_t const usdhc2_pads[] = {
 	MX6_PAD_SD2_DAT1__SD2_DATA1	| MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD2_DAT2__SD2_DATA2	| MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD2_DAT3__SD2_DATA3	| MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NANDF_D4__SD2_DATA4	| MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NANDF_D5__SD2_DATA5	| MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NANDF_D6__SD2_DATA6	| MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NANDF_D7__SD2_DATA7	| MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NANDF_D2__GPIO2_IO02	| MUX_PAD_CTRL(NO_PAD_CTRL), /* CD */
+#ifdef CONFIG_EMBEDSKY_E9
+	MX6_PAD_GPIO_4__GPIO1_IO04			| MUX_PAD_CTRL(NO_PAD_CTRL), /* CD */
+#else
+	MX6_PAD_NANDF_D4__SD2_DATA4			| MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_NANDF_D5__SD2_DATA5			| MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_NANDF_D6__SD2_DATA6			| MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_NANDF_D7__SD2_DATA7			| MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_NANDF_D2__GPIO2_IO02		| MUX_PAD_CTRL(NO_PAD_CTRL), /* CD */
+#endif /* CONFIG_EMBEDSKY_E9 */
 };
 
 static iomux_v3_cfg_t const usdhc3_pads[] = {
@@ -150,10 +204,12 @@ static iomux_v3_cfg_t const usdhc3_pads[] = {
 	MX6_PAD_SD3_DAT1__SD3_DATA1 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_DAT2__SD3_DATA2 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_DAT3__SD3_DATA3 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+#ifndef CONFIG_EMBEDSKY_E9
 	MX6_PAD_SD3_DAT4__SD3_DATA4 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_DAT5__SD3_DATA5 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_DAT6__SD3_DATA6 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_DAT7__SD3_DATA7 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+#endif /* CONFIG_EMBEDSKY_E9 */
 	MX6_PAD_NANDF_D0__GPIO2_IO00    | MUX_PAD_CTRL(NO_PAD_CTRL), /* CD */
 };
 
@@ -308,6 +364,11 @@ static iomux_v3_cfg_t const epdc_disable_pads[] = {
 static void setup_iomux_uart(void)
 {
 	imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
+#ifdef CONFIG_EMBEDSKY_E9
+	imx_iomux_v3_setup_multiple_pads(uart2_pads, ARRAY_SIZE(uart2_pads));
+	imx_iomux_v3_setup_multiple_pads(uart3_pads, ARRAY_SIZE(uart3_pads));
+	imx_iomux_v3_setup_multiple_pads(uart4_pads, ARRAY_SIZE(uart4_pads));
+#endif /* CONFIG_EMBEDSKY_E9 */
 }
 
 #ifdef CONFIG_FSL_ESDHC
@@ -346,7 +407,11 @@ int mmc_map_to_kernel_blk(int dev_no)
 	return dev_no + 1;
 }
 
+#ifdef CONFIG_EMBEDSKY_E9
+#define USDHC2_CD_GPIO	IMX_GPIO_NR(1, 4)
+#else
 #define USDHC2_CD_GPIO	IMX_GPIO_NR(2, 2)
+#endif /* CONFIG_EMBEDSKY_E9 */
 #define USDHC3_CD_GPIO	IMX_GPIO_NR(2, 0)
 
 int board_mmc_getcd(struct mmc *mmc)
@@ -481,7 +546,7 @@ void board_late_mmc_env_init(void)
 	/* Set mmcblk env */
 	sprintf(mmcblk, "/dev/mmcblk%dp2 rootwait rw",
 		mmc_map_to_kernel_blk(dev_no));
-	setenv("mmcroot", mmcblk);
+	//setenv("mmcroot", mmcblk);//qpq
 
 	sprintf(cmd, "mmc dev %d", dev_no);
 	run_command(cmd, 0);
@@ -730,12 +795,31 @@ static void enable_lvds(struct display_info_t const *dev)
 	struct iomuxc *iomux = (struct iomuxc *)
 				IOMUXC_BASE_ADDR;
 	u32 reg = readl(&iomux->gpr[2]);
-	reg |= IOMUXC_GPR2_DATA_WIDTH_CH0_18BIT |
-	       IOMUXC_GPR2_DATA_WIDTH_CH1_18BIT;
+	reg |= IOMUXC_GPR2_DATA_WIDTH_CH0_18BIT;
 	writel(reg, &iomux->gpr[2]);
 }
 
 struct display_info_t const displays[] = {{
+        .bus    = 0,
+        .addr   = 0,
+        .pixfmt = IPU_PIX_FMT_LVDS666,
+        .detect = NULL,
+        .enable = enable_lvds,
+        .mode   = {
+                .name           = "1366x768@60",
+                .refresh        = 60,
+                .xres           = 1366,
+                .yres           = 768,
+                .pixclock       = 15385,
+                .left_margin    = 220,
+                .right_margin   = 40,
+                .upper_margin   = 21,
+                .lower_margin   = 7,
+                .hsync_len      = 60,
+                .vsync_len      = 10,
+                .sync           = FB_SYNC_EXT,
+                .vmode          = FB_VMODE_NONINTERLACED
+} },{
 	.bus	= -1,
 	.addr	= 0,
 	.pixfmt	= IPU_PIX_FMT_RGB666,
@@ -795,7 +879,48 @@ struct display_info_t const displays[] = {{
 		.vsync_len      = 10,
 		.sync           = 0,
 		.vmode          = FB_VMODE_NONINTERLACED
-} } };
+} } ,{
+	.bus	= 0,
+	.addr	= 0,
+	.pixfmt	= IPU_PIX_FMT_RGB24,
+	.detect	= NULL,
+	.enable	= enable_rgb,
+	.mode	= {
+		.name           = "CLAA-WVGA",
+		.refresh        = 57,
+		.xres           = 800,
+		.yres           = 480,
+		.pixclock       = 37037,
+		.left_margin    = 25,
+		.right_margin   = 75,
+		.upper_margin   = 10,
+		.lower_margin   = 10,
+		.hsync_len      = 20,
+		.vsync_len      = 10,
+		.sync           = 0,
+		.vmode          = FB_VMODE_NONINTERLACED
+} } , {
+	.bus    = 0,
+        .addr   = 0,
+        .pixfmt = IPU_PIX_FMT_RGB24,
+        .detect = NULL,
+        .enable = enable_rgb,
+        .mode   = {
+                .name           = "TQ-TFT_1024600",
+                .refresh        = 60,
+                .xres           = 1024,
+                .yres           = 600,
+                .pixclock       = 19529,
+                .left_margin    = 150,
+                .right_margin   = 150,
+                .upper_margin   = 15,
+                .lower_margin   = 15,
+                .hsync_len      = 20,
+                .vsync_len      = 5,
+                .sync           = 0,
+                .vmode          = FB_VMODE_NONINTERLACED
+} }
+};
 size_t display_count = ARRAY_SIZE(displays);
 
 static void setup_display(void)
@@ -841,8 +966,8 @@ static void setup_display(void)
 	     | IOMUXC_GPR2_DATA_WIDTH_CH1_18BIT
 	     | IOMUXC_GPR2_BIT_MAPPING_CH0_SPWG
 	     | IOMUXC_GPR2_DATA_WIDTH_CH0_18BIT
-	     | IOMUXC_GPR2_LVDS_CH0_MODE_DISABLED
-	     | IOMUXC_GPR2_LVDS_CH1_MODE_ENABLED_DI0;
+	     | IOMUXC_GPR2_LVDS_CH0_MODE_ENABLED_DI0
+	     | IOMUXC_GPR2_LVDS_CH1_MODE_DISABLED;
 	writel(reg, &iomux->gpr[2]);
 
 	reg = readl(&iomux->gpr[3]);
@@ -865,8 +990,31 @@ int overwrite_console(void)
 
 int board_eth_init(bd_t *bis)
 {
+#if 0
+	if (is_mx6dqp()) {
+		int ret;
+
+		/* select ENET MAC0 TX clock from PLL */
+		imx_iomux_set_gpr_register(5, 9, 1, 1);
+		ret = enable_fec_anatop_clock(0, ENET_125MHZ);
+		if (ret)
+		    printf("Error fec anatop clock settings!\n");
+	}
+#endif
+	char *ptmp;
+	char cmd[256];
+	char addr[6];
 	setup_iomux_enet();
-	setup_pcie();
+//	setup_pcie();
+
+	ptmp = getenv("ethaddr");
+	if(strcmp(ptmp,"00:00:00:00:00:00") == 0) {
+	    eth_random_addr(addr);
+	    sprintf(cmd,"setenv ethaddr %02x:%02x:%02x:%02x:%02x:%02x;saveenv\n",
+	    addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+	    printf("%s\n",cmd);
+	    run_command(cmd, 0);
+	}
 
 	return cpu_eth_init(bis);
 }
@@ -944,11 +1092,28 @@ int board_early_init_f(void)
 	return 0;
 }
 
+#ifdef CONFIG_EMBEDSKY_E9
+#define BOARD_POWER_CTRL    IMX_GPIO_NR(6, 31)
+static iomux_v3_cfg_t const poweron_pads[] = {
+	MX6_PAD_EIM_BCLK__GPIO6_IO31		| MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+static void e9_board_poweron(int onoff)
+{
+	imx_iomux_v3_setup_multiple_pads(poweron_pads, ARRAY_SIZE(poweron_pads));
+	if (onoff != 0)
+		gpio_direction_output(BOARD_POWER_CTRL, 1);
+	else
+		gpio_direction_output(BOARD_POWER_CTRL, 0);
+}
+#endif /* CONFIG_EMBEDSKY_E9 */
 int board_init(void)
 {
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
 
+#ifdef CONFIG_EMBEDSKY_E9
+	e9_board_poweron(1);
+#endif /* CONFIG_EMBEDSKY_E9 */
 #ifdef CONFIG_MXC_SPI
 	setup_spi();
 #endif
@@ -969,6 +1134,7 @@ int board_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_POWER
 static struct pmic *pfuze;
 int power_init_board(void)
 {
@@ -1162,6 +1328,7 @@ void ldo_mode_set(int ldo_bypass)
 	}
 }
 #endif
+#endif /* CONFIG_POWER */
 
 #ifdef CONFIG_CMD_BMODE
 static const struct boot_mode board_boot_modes[] = {
@@ -1169,7 +1336,11 @@ static const struct boot_mode board_boot_modes[] = {
 	{"sd2",	 MAKE_CFGVAL(0x40, 0x28, 0x00, 0x00)},
 	{"sd3",	 MAKE_CFGVAL(0x40, 0x30, 0x00, 0x00)},
 	/* 8 bit bus width */
+#ifdef CONFIG_EMBEDSKY_E9
+	{"emmc", MAKE_CFGVAL(0x40, 0x38, 0x00, 0x00)},
+#else
 	{"emmc", MAKE_CFGVAL(0x60, 0x58, 0x00, 0x00)},
+#endif /* CONFIG_EMBEDSKY_E9 */
 	{NULL,	 0},
 };
 #endif

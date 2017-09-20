@@ -18,6 +18,9 @@
 #include "imx6_spl.h"
 #endif
 
+#define CONFIG_EMBEDSKY_E9	
+#define CONFIG_EMBEDSKY_AR8035
+
 #define CONFIG_MACH_TYPE	3980
 #define CONFIG_MXC_UART_BASE	UART1_BASE
 #define CONFIG_CONSOLE_DEV		"ttymxc0"
@@ -27,7 +30,7 @@
 #define PHYS_SDRAM_SIZE		(1u * 1024 * 1024 * 1024)
 #elif defined(CONFIG_MX6Q)
 #define CONFIG_DEFAULT_FDT_FILE	"imx6q-sabresd.dtb"
-#define PHYS_SDRAM_SIZE		(1u * 1024 * 1024 * 1024)
+#define PHYS_SDRAM_SIZE					(2u * 1024 * 1024 * 1024)
 #elif defined(CONFIG_MX6DL)
 #define CONFIG_DEFAULT_FDT_FILE	"imx6dl-sabresd.dtb"
 #define PHYS_SDRAM_SIZE		(1u * 1024 * 1024 * 1024)
@@ -39,7 +42,11 @@
 #include "mx6sabre_common.h"
 
 #define CONFIG_SYS_FSL_USDHC_NUM	3
-#define CONFIG_SYS_MMC_ENV_DEV		1	/* SDHC3 */
+#ifdef CONFIG_EMBEDSKY_E9
+#define CONFIG_SYS_MMC_ENV_DEV			0	/* SDHC4 */
+#else
+#define CONFIG_SYS_MMC_ENV_DEV			1	/* SDHC3 */
+#endif /* CONFIG_EMBEDSKY_E9 */
 #define CONFIG_SYS_MMC_ENV_PART                0       /* user partition */
 
 #ifdef CONFIG_SYS_USE_SPINOR
@@ -68,10 +75,12 @@
 #endif
 
 /* PMIC */
+#ifndef CONFIG_EMBEDSKY_E9
 #define CONFIG_POWER
 #define CONFIG_POWER_I2C
 #define CONFIG_POWER_PFUZE100
 #define CONFIG_POWER_PFUZE100_I2C_ADDR	0x08
+#endif /* !CONFIG_EMBEDSKY_E9 */
 
 /* USB Configs */
 #define CONFIG_CMD_USB
@@ -84,7 +93,7 @@
 #define CONFIG_USB_ETHER_ASIX
 #define CONFIG_MXC_USB_PORTSC		(PORT_PTS_UTMI | PORT_PTS_PTW)
 #define CONFIG_MXC_USB_FLAGS		0
-#define CONFIG_USB_MAX_CONTROLLER_COUNT	1 /* Enabled USB controller number */
+#define CONFIG_USB_MAX_CONTROLLER_COUNT	2 /* Enabled USB controller number */
 #endif
 
 /*#define CONFIG_SPLASH_SCREEN*/
